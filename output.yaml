@@ -301,15 +301,13 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
           readOnly: true
-      securityContext:
-        runAsNonRoot: true
       serviceAccountName: guestbook-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: webhook-server-cert
+          secretName: guestbook-webhook-server-cert
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -323,7 +321,7 @@ spec:
   issuerRef:
     kind: Issuer
     name: guestbook-selfsigned-issuer
-  secretName: webhook-server-cert
+  secretName: guestbook-webhook-server-cert
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer

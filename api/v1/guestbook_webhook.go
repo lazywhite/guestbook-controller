@@ -17,10 +17,12 @@ limitations under the License.
 package v1
 
 import (
+	"errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"strings"
 )
 
 // log is for logging in this package.
@@ -43,6 +45,9 @@ func (r *GuestBook) Default() {
 	guestbooklog.Info("default", "name", r.Name)
 
 	// TODO(user): fill in your defaulting logic.
+	if r.Spec.Foo == "" {
+		r.Spec.Foo = "default"
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -55,7 +60,8 @@ func (r *GuestBook) ValidateCreate() error {
 	guestbooklog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
-	return nil
+
+	return r.ValidateSpec()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -63,7 +69,7 @@ func (r *GuestBook) ValidateUpdate(old runtime.Object) error {
 	guestbooklog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
-	return nil
+	return r.ValidateSpec()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -71,5 +77,11 @@ func (r *GuestBook) ValidateDelete() error {
 	guestbooklog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
+	return nil
+}
+func (r *GuestBook) ValidateSpec() error {
+	if strings.Contains(r.Spec.Foo, "black") {
+		return errors.New("spec.foo can not contain black")
+	}
 	return nil
 }

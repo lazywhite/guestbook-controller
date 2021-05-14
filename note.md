@@ -18,9 +18,16 @@ kubebuilder3.0.0 create webhook --group webapp --version v1 --kind GuestBook --w
 
 ## issue
 ```
-controller-gen生成的crd apiversion 总是apiextensions.k8s.io/v1, 修改PROJECT里面的resources/api/crdVersion没有用 
-生成的ValidateWebhookConfiguration, 名字都叫validating-webhook-configuration, 可以通过设置namePrefix来解决
+1. controller-gen生成的crd apiversion 总是apiextensions.k8s.io/v1, 修改PROJECT里面的resources/api/crdVersion没有用 
+2. 生成的ValidateWebhookConfiguration, 名字都叫validating-webhook-configuration, 可以通过设置namePrefix来解决
     config/default/kustomization.yaml
         namePrefix: "guestbook-"
+3. controller-gen 命令行工具脱离此项目使用
+4. config/certmanager/certificate.yam
+    spec.secretName  #注意修改
+   config/default/manager_webhook_patch.yaml
+    volumes:
+        secretName # 注意保持一致
+    
 ```
 
