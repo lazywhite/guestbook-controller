@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-  name: guestbook
+  name: system
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -59,14 +59,14 @@ status:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: controller-manager
-  namespace: guestbook
+  name: guestbook-controller-manager
+  namespace: system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: leader-election-role
-  namespace: guestbook
+  name: guestbook-leader-election-role
+  namespace: system
 rules:
 - apiGroups:
   - ""
@@ -104,7 +104,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: manager-role
+  name: guestbook-manager-role
 rules:
 - apiGroups:
   - webapp.example.org
@@ -136,7 +136,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: metrics-reader
+  name: guestbook-metrics-reader
 rules:
 - nonResourceURLs:
   - /metrics
@@ -146,7 +146,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: proxy-role
+  name: guestbook-proxy-role
 rules:
 - apiGroups:
   - authentication.k8s.io
@@ -164,42 +164,42 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: leader-election-rolebinding
-  namespace: guestbook
+  name: guestbook-leader-election-rolebinding
+  namespace: system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: leader-election-role
+  name: guestbook-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: controller-manager
-  namespace: guestbook
+  name: guestbook-controller-manager
+  namespace: system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: manager-rolebinding
+  name: guestbook-manager-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: manager-role
+  name: guestbook-manager-role
 subjects:
 - kind: ServiceAccount
-  name: controller-manager
-  namespace: guestbook
+  name: guestbook-controller-manager
+  namespace: system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: proxy-rolebinding
+  name: guestbook-proxy-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: proxy-role
+  name: guestbook-proxy-role
 subjects:
 - kind: ServiceAccount
-  name: controller-manager
-  namespace: guestbook
+  name: guestbook-controller-manager
+  namespace: system
 ---
 apiVersion: v1
 data:
@@ -217,16 +217,16 @@ data:
       resourceName: 84ef8406.example.org
 kind: ConfigMap
 metadata:
-  name: manager-config
-  namespace: guestbook
+  name: guestbook-manager-config
+  namespace: system
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
     control-plane: controller-manager
-  name: controller-manager-metrics-service
-  namespace: guestbook
+  name: guestbook-controller-manager-metrics-service
+  namespace: system
 spec:
   ports:
   - name: https
@@ -235,13 +235,25 @@ spec:
   selector:
     control-plane: controller-manager
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guestbook-webhook-service
+  namespace: system
+spec:
+  ports:
+  - port: 443
+    targetPort: 9443
+  selector:
+    control-plane: controller-manager
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     control-plane: controller-manager
-  name: controller-manager
-  namespace: guestbook
+  name: guestbook-controller-manager
+  namespace: system
 spec:
   replicas: 1
   selector:
@@ -265,6 +277,10 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz
@@ -280,7 +296,96 @@ spec:
             memory: 20Mi
         securityContext:
           allowPrivilegeEscalation: false
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: controller-manager
+      serviceAccountName: guestbook-controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: guestbook-serving-cert
+  namespace: system
+spec:
+  dnsNames:
+  - guestbook-webhook-service.system.svc
+  - guestbook-webhook-service.system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: guestbook-selfsigned-issuer
+  secretName: webhook-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: guestbook-selfsigned-issuer
+  namespace: system
+spec:
+  selfSigned: {}
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: system/guestbook-serving-cert
+  name: guestbook-mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: guestbook-webhook-service
+      namespace: system
+      path: /mutate-webapp-example-org-v1-guestbook
+  failurePolicy: Fail
+  name: mguestbook.kb.io
+  rules:
+  - apiGroups:
+    - webapp.example.org
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - guestbooks
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: system/guestbook-serving-cert
+  name: guestbook-validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: guestbook-webhook-service
+      namespace: system
+      path: /validate-webapp-example-org-v1-guestbook
+  failurePolicy: Fail
+  name: vguestbook.kb.io
+  rules:
+  - apiGroups:
+    - webapp.example.org
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - guestbooks
+  sideEffects: None
