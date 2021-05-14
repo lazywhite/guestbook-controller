@@ -1,6 +1,7 @@
 ## requirement
 ```
 kubebuilder == 3.0.0
+cert-manager
 ```
 
 ## step
