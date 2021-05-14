@@ -1,0 +1,16 @@
+domain: example.org
+layout:
+- go.kubebuilder.io/v3
+projectName: guestbook
+repo: github.com/lazywhite/guestbook-controller
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: example.org
+  group: webapp
+  kind: GuestBook
+  path: github.com/lazywhite/guestbook-controller/api/v1
+  version: v1
+version: "3"
