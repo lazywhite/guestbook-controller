@@ -5,7 +5,7 @@ projectName: guestbook
 repo: github.com/lazywhite/guestbook-controller
 resources:
 - api:
-    crdVersion: v1
+    crdVersion: v1beta1
     namespaced: true
   controller: true
   domain: example.org
@@ -13,4 +13,8 @@ resources:
   kind: GuestBook
   path: github.com/lazywhite/guestbook-controller/api/v1
   version: v1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1beta1
 version: "3"
