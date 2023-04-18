@@ -19,5 +19,3 @@ testbin/*
 *.swp
 *.swo
 *~
-
-vendor/**
